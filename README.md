@@ -1,6 +1,14 @@
 # Hyper-Local Food Ordering & Kitchen Display System (KDS)
 
-A zero-install, real-time food ordering storefront and Kitchen Display System (KDS) built for a gated industrial township of **1,300 residential units** (1,176 flats + 124 villas) outside third-party delivery coverage.
+A zero-install, real-time food ordering storefront and Kitchen Display System (KDS) built for a gated residential township of **1,300 residential units** (1,176 flats + 124 villas) outside third-party delivery coverage.
+
+## Screenshots
+
+| Resident Ordering Storefront (`index.html`) | Kitchen Display System (`kitchen.html`) |
+| :---: | :---: |
+| ![Resident App](<img width="867" height="1600" alt="image" src="https://github.com/user-attachments/assets/991345e7-90cb-465b-b0c5-b413bcd93b5e" />
+) | ![Kitchen KDS](<img width="1600" height="904" alt="image" src="https://github.com/user-attachments/assets/6da0ee91-ddbc-4ee7-9411-29c201fe1c3a" />
+) |
 
 ---
 
@@ -36,4 +44,4 @@ A lightweight, two-interface web application powered by **PostgreSQL Realtime We
 ├── index.html          # Resident menu, unit validator, checkout & live order tracker
 ├── kitchen.html        # Restaurant KDS Kanban board, audio alerts & stock toggles
 ├── schema.sql          # PostgreSQL tables, Realtime publications, RLS policies & seed data
-└── config.example.js   # Supabase client configuration template# township-food-ordering-kds
+└── config.example.js   # Supabase client configuration template
