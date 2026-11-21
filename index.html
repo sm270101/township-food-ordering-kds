@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HMEL Club House Restaurant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 pb-28">
+  <header class="bg-emerald-700 text-white p-4 sticky top-0 z-20 shadow">
+    <div class="max-w-lg mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold">Club House Restaurant</h1>
+        <p class="text-xs text-emerald-100">HMEL Township Intra-Delivery</p>
+      </div>
+      <span class="bg-emerald-900 text-xs px-2.5 py-1 rounded-full font-medium">● Live Menu</span>
+    </div>
+  </header>
+
+  <main class="max-w-lg mx-auto p-4 space-y-4">
+    <!-- Active Order Live Tracker -->
+    <section id="tracker-box" class="hidden bg-white p-4 rounded-xl shadow border-l-4 border-emerald-600 space-y-3">
+      <div class="flex justify-between items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Live Order Status</span>
+        <div class="flex items-center gap-2">
+          <span id="track-id" class="text-xs font-mono text-gray-500"></span>
+          <button onclick="clearTracker()" class="text-[11px] text-gray-400 underline hover:text-gray-600">Dismiss</button>
+        </div>
+      </div>
+
+      <div>
+        <h2 id="track-status-text" class="text-xl font-bold text-gray-800">Order Placed</h2>
+        <p id="track-subtext" class="text-sm text-gray-500">Waiting for restaurant kitchen to accept...</p>
+      </div>
+
+      <!-- 4-Step Progress Bar -->
+      <div class="grid grid-cols-4 gap-1.5 text-center text-[11px] font-semibold">
+        <div id="step-placed" class="p-1.5 rounded bg-emerald-600 text-white">1. Placed</div>
+        <div id="step-accepted" class="p-1.5 rounded bg-gray-200 text-gray-500">2. Cooking</div>
+        <div id="step-out_for_delivery" class="p-1.5 rounded bg-gray-200 text-gray-500">3. On Way</div>
+        <div id="step-delivered" class="p-1.5 rounded bg-gray-200 text-gray-500">4. Delivered</div>
+      </div>
+
+      <!-- Itemized Receipt -->
+      <div class="bg-gray-50 p-3 rounded-lg border text-xs space-y-1.5">
+        <div class="flex justify-between font-semibold text-gray-700 border-b pb-1">
+          <span>Order Summary</span>
+          <span id="track-pay-badge" class="text-emerald-700"></span>
+        </div>
+        <ul id="track-items-list" class="space-y-1 text-gray-600"></ul>
+        <div class="flex justify-between font-bold text-gray-900 border-t pt-1">
+          <span>Total Payable</span>
+          <span id="track-total"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Search & Veg/Non-Veg Filter -->
+    <div class="space-y-2.5 bg-white p-3 rounded-xl shadow-sm border">
+      <input id="search-input" oninput="renderMenu()" type="text" placeholder="Search 138 dishes (e.g. Paneer, Biryani, Naan, Tikka)..."
+        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600" />
+      <div class="flex gap-2">
+        <button onclick="setDiet('All')" id="diet-All" class="px-3 py-1 rounded-lg text-xs font-bold border bg-gray-800 text-white border-gray-800">All</button>
+        <button onclick="setDiet('Veg')" id="diet-Veg" class="px-3 py-1 rounded-lg text-xs font-bold border bg-white text-green-700 border-green-600">🟢 Veg Only</button>
+        <button onclick="setDiet('Non-Veg')" id="diet-Non-Veg" class="px-3 py-1 rounded-lg text-xs font-bold border bg-white text-red-700 border-red-600">🔺 Non-Veg</button>
+      </div>
+    </div>
+
+    <!-- Category Pills -->
+    <div id="category-tabs" class="flex gap-2 overflow-x-auto pb-1"></div>
+
+    <!-- Menu Section -->
+    <section>
+      <div id="menu-list" class="space-y-2.5">
+        <p class="text-sm text-gray-400">Loading Club House menu...</p>
+      </div>
+    </section>
+
+    <!-- Checkout Form -->
+    <section id="checkout-section" class="hidden bg-white p-4 rounded-xl shadow space-y-3 border">
+      <h2 class="text-base font-bold border-b pb-2">Delivery Details</h2>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Resident Name</label>
+        <input id="cust-name" type="text" placeholder="e.g. Sudhanshu Mathur" class="w-full border rounded-lg p-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Mobile Number</label>
+        <input id="cust-phone" type="tel" placeholder="10-digit number" class="w-full border rounded-lg p-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Flat / Villa Number (HMEL Township)</label>
+        <div class="flex gap-2">
+          <input id="cust-unit-num" oninput="resolveUnit()" type="number" inputmode="numeric" placeholder="Enter No. (e.g. 204 or 512)"
+            class="w-1/2 border rounded-lg p-2 text-sm font-semibold focus:outline-none focus:border-emerald-600" />
+          <select id="cust-phase" onchange="validatePhaseMatch()" class="w-1/2 border rounded-lg p-2 text-sm bg-white">
+            <option value="">-- Auto-Detected Phase --</option>
+            <option value="Ph-1 Flat">Ph-1 Flat (101–300)</option>
+            <option value="Ph-2 Flat">Ph-2 Flat (301–388, 397–412)</option>
+            <option value="Ph-3 Flat">Ph-3 Flat (389–396, 413–476, 731–970)</option>
+            <option value="Ph-4 Flat">Ph-4 Flat (1001–1560)</option>
+            <option value="Ph-1 Villa">Ph-1 Villa (501–610, 701–708, 1000)</option>
+            <option value="Ph-4 Villa">Ph-4 Villa (709–713)</option>
+          </select>
+        </div>
+        <p id="unit-hint" class="text-[11px] mt-1 text-gray-500">Enter your Flat or Villa number (1,300 valid township units).</p>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Payment Mode</label>
+        <select id="pay-method" class="w-full border rounded-lg p-2 text-sm bg-white">
+          <option value="UPI_ON_DELIVERY">UPI Scan on Delivery</option>
+          <option value="COD">Cash on Delivery (COD)</option>
+        </select>
+      </div>
+      <button onclick="placeOrder()" id="place-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow">
+        Place Order • ₹<span id="btn-total">0</span>
+      </button>
+    </section>
+  </main>
+
+  <!-- Sticky Cart Bar -->
+  <div id="cart-bar" class="hidden fixed bottom-0 inset-x-0 bg-gray-900 text-white p-3 shadow-lg z-20">
+    <div class="max-w-lg mx-auto flex justify-between items-center">
+      <div>
+        <span id="cart-count" class="font-bold">0 Items</span>
+        <span class="mx-2">|</span>
+        <span class="font-bold text-emerald-400">₹<span id="cart-total">0</span></span>
+      </div>
+      <a href="#checkout-section" class="bg-emerald-500 text-gray-950 font-bold px-4 py-1.5 rounded-lg text-sm">Checkout ↓</a>
+    </div>
+  </div>
+
+  <script>
+    let menu = [];
+    let cart = {};
+    let selectedCategory = 'All';
+    let selectedDiet = 'All';
+    let activeOrderId = localStorage.getItem('hmel_active_order');
+
+    // Exact HMEL Township Unit Lookup (1,176 Flats + 124 Villas = 1,300 Units)
+    function lookupTownshipUnit(num) {
+      if (!Number.isInteger(num)) return null;
+      if (num >= 101 && num <= 300) return 'Ph-1 Flat';
+      if ((num >= 301 && num <= 388) || (num >= 397 && num <= 412)) return 'Ph-2 Flat';
+      if ((num >= 389 && num <= 396) || (num >= 413 && num <= 476) || (num >= 731 && num <= 970)) return 'Ph-3 Flat';
+      if (num >= 1001 && num <= 1560) return 'Ph-4 Flat';
+      if ((num >= 501 && num <= 610) || (num >= 701 && num <= 708) || num === 1000) return 'Ph-1 Villa';
+      if (num >= 709 && num <= 713) return 'Ph-4 Villa';
+      return null;
+    }
+
+    function resolveUnit() {
+      const raw = document.getElementById('cust-unit-num').value.trim();
+      const phaseSelect = document.getElementById('cust-phase');
+      const hint = document.getElementById('unit-hint');
+
+      if (!raw) {
+        phaseSelect.value = '';
+        hint.className = 'text-[11px] mt-1 text-gray-500';
+        hint.innerText = 'Enter your Flat or Villa number (1,300 valid township units).';
+        return;
+      }
+
+      const num = parseInt(raw, 10);
+      const detected = lookupTownshipUnit(num);
+      if (detected) {
+        phaseSelect.value = detected;
+        hint.className = 'text-[11px] mt-1 font-semibold text-emerald-700';
+        hint.innerText = `✓ Verified: ${detected} #${num}`;
+      } else {
+        phaseSelect.value = '';
+        hint.className = 'text-[11px] mt-1 font-semibold text-red-600';
+        hint.innerText = `✕ Unit #${num} is not a valid HMEL Township Flat or Villa number.`;
+      }
+    }
+
+    function validatePhaseMatch() {
+      const raw = document.getElementById('cust-unit-num').value.trim();
+      const chosen = document.getElementById('cust-phase').value;
+      const hint = document.getElementById('unit-hint');
+      if (!raw || !chosen) return;
+      const detected = lookupTownshipUnit(parseInt(raw, 10));
+      if (detected && detected !== chosen) {
+        hint.className = 'text-[11px] mt-1 font-semibold text-amber-600';
+        hint.innerText = `⚠ Note: Unit #${raw} belongs to ${detected}, not ${chosen}.`;
+      }
+    }
+
+    async function fetchMenu() {
+      const { data } = await db.from('menu_items').select('*').order('category').order('name');
+      if (data) {
+        menu = data;
+        Object.keys(cart).forEach(id => {
+          const item = menu.find(m => m.id === id);
+          if (!item || !item.is_available) delete cart[id];
+        });
+        renderCategories();
+        renderMenu();
+        updateCartUI();
+      }
+    }
+
+    function setDiet(diet) {
+      selectedDiet = diet;
+      ['All', 'Veg', 'Non-Veg'].forEach(d => {
+        const btn = document.getElementById('diet-' + d);
+        if (d === diet) {
+          btn.className = d === 'Veg'
+            ? 'px-3 py-1 rounded-lg text-xs font-bold border bg-green-700 text-white border-green-700'
+            : d === 'Non-Veg'
+              ? 'px-3 py-1 rounded-lg text-xs font-bold border bg-red-700 text-white border-red-700'
+              : 'px-3 py-1 rounded-lg text-xs font-bold border bg-gray-800 text-white border-gray-800';
+        } else {
+          btn.className = d === 'Veg'
+            ? 'px-3 py-1 rounded-lg text-xs font-bold border bg-white text-green-700 border-green-600'
+            : d === 'Non-Veg'
+              ? 'px-3 py-1 rounded-lg text-xs font-bold border bg-white text-red-700 border-red-600'
+              : 'px-3 py-1 rounded-lg text-xs font-bold border bg-white text-gray-700 border-gray-300';
+        }
+      });
+      renderMenu();
+    }
+
+    function renderCategories() {
+      const cats = ['All', ...new Set(menu.map(m => m.category))];
+      document.getElementById('category-tabs').innerHTML = cats.map(c => `
+        <button onclick="setCategory('${c}')"
+          class="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border ${selectedCategory === c ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-300'}">
+          ${c}
+        </button>
+      `).join('');
+    }
+
+    function setCategory(cat) {
+      selectedCategory = cat;
+      renderCategories();
+      renderMenu();
+    }
+
+    function renderMenu() {
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+      const filtered = menu.filter(m => {
+        const matchCat = selectedCategory === 'All' || m.category === selectedCategory;
+        const matchDiet = selectedDiet === 'All' || (m.diet_type || 'Veg') === selectedDiet;
+        const matchQuery = !query || m.name.toLowerCase().includes(query) || m.category.toLowerCase().includes(query);
+        return matchCat && matchDiet && matchQuery;
+      });
+
+      const container = document.getElementById('menu-list');
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-sm text-gray-400 text-center py-6">No matching dishes found.</p>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        const qty = cart[item.id] || 0;
+        const disabled = !item.is_available;
+        const isNonVeg = item.diet_type === 'Non-Veg';
+        const dietBadge = isNonVeg
+          ? `<span class="inline-block w-3 h-3 border border-red-600 flex items-center justify-center mr-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-600"></span></span>`
+          : `<span class="inline-block w-3 h-3 border border-green-600 flex items-center justify-center mr-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-600"></span></span>`;
+
+        return `
+          <div class="bg-white p-3.5 rounded-xl shadow-sm border flex justify-between items-center gap-3 ${disabled ? 'opacity-55 bg-gray-100' : ''}">
+            <div class="flex-1">
+              <div class="flex items-center text-[10px] uppercase font-bold text-gray-400 mb-0.5">
+                ${dietBadge}
+                <span>${item.category}</span>
+                ${item.portion_size ? `<span class="mx-1.5">•</span><span class="text-gray-500">${item.portion_size}</span>` : ''}
+              </div>
+              <h3 class="font-bold text-gray-800 text-sm leading-snug">${item.name}</h3>
+              <p class="text-sm font-bold text-gray-900 mt-0.5">₹${item.price}</p>
+            </div>
+            <div>
+              ${disabled
+                ? `<span class="text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded border border-red-200 whitespace-nowrap">Sold Out</span>`
+                : qty === 0
+                  ? `<button onclick="changeQty('${item.id}', 1)" class="bg-emerald-50 text-emerald-700 border border-emerald-600 font-bold px-4 py-1 rounded-lg text-sm whitespace-nowrap">+ Add</button>`
+                  : `<div class="flex items-center space-x-2 bg-emerald-600 text-white rounded-lg px-2 py-1">
+                      <button onclick="changeQty('${item.id}', -1)" class="font-bold px-1.5">-</button>
+                      <span class="font-bold text-sm">${qty}</span>
+                      <button onclick="changeQty('${item.id}', 1)" class="font-bold px-1.5">+</button>
+                    </div>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function changeQty(id, delta) {
+      cart[id] = (cart[id] || 0) + delta;
+      if (cart[id] <= 0) delete cart[id];
+      renderMenu();
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      let count = 0, total = 0;
+      Object.entries(cart).forEach(([id, qty]) => {
+        const item = menu.find(m => m.id === id);
+        if (item) { count += qty; total += item.price * qty; }
+      });
+      document.getElementById('cart-count').innerText = `${count} Item${count > 1 ? 's' : ''}`;
+      document.getElementById('cart-total').innerText = total;
+      document.getElementById('btn-total').innerText = total;
+      document.getElementById('cart-bar').classList.toggle('hidden', count === 0);
+      document.getElementById('checkout-section').classList.toggle('hidden', count === 0);
+    }
+
+    async function placeOrder() {
+      const name = document.getElementById('cust-name').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      const unitRaw = document.getElementById('cust-unit-num').value.trim();
+      const unitNum = parseInt(unitRaw, 10);
+      const validPhase = lookupTownshipUnit(unitNum);
+      const pay = document.getElementById('pay-method').value;
+
+      if (!name || !phone || !unitRaw) return alert('Please fill your Name, Mobile Number, and Flat/Villa Number.');
+      if (!validPhase) return alert(`Unit #${unitRaw} is not a valid HMEL Township Flat or Villa number.`);
+
+      document.getElementById('cust-phase').value = validPhase;
+      localStorage.setItem('hmel_user_profile', JSON.stringify({ name, phone, unitRaw }));
+
+      const itemsPayload = Object.entries(cart).map(([id, qty]) => {
+        const m = menu.find(x => x.id === id);
+        return { item_id: id, item_name: m.name, quantity: qty, price_at_order: m.price };
+      });
+      const total = itemsPayload.reduce((sum, i) => sum + i.price_at_order * i.quantity, 0);
+
+      document.getElementById('place-btn').disabled = true;
+      const { data: order, error } = await db.from('orders').insert({
+        customer_name: name,
+        customer_phone: phone,
+        quarter_number: `${validPhase} #${unitNum}`,
+        total_amount: total,
+        payment_method: pay
+      }).select().single();
+
+      if (error) {
+        alert('Order failed: ' + error.message);
+        document.getElementById('place-btn').disabled = false;
+        return;
+      }
+
+      await db.from('order_items').insert(itemsPayload.map(i => ({ ...i, order_id: order.id })));
+
+      cart = {};
+      renderMenu();
+      updateCartUI();
+      document.getElementById('place-btn').disabled = false;
+      localStorage.setItem('hmel_active_order', order.id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      trackOrder(order.id);
+    }
+
+    async function trackOrder(orderId) {
+      const { data } = await db.from('orders').select('*, order_items(*)').eq('id', orderId).single();
+      if (!data) return;
+      renderTracker(data);
+
+      db.channel('order-' + orderId)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, async () => {
+          const { data: updated } = await db.from('orders').select('*, order_items(*)').eq('id', orderId).single();
+          if (updated) renderTracker(updated);
+        }).subscribe();
+    }
+
+    function renderTracker(order) {
+      const box = document.getElementById('tracker-box');
+      box.classList.remove('hidden');
+      document.getElementById('track-id').innerText = '#' + order.id.slice(0, 6).toUpperCase();
+      document.getElementById('track-pay-badge').innerText = order.payment_method;
+      document.getElementById('track-total').innerText = '₹' + order.total_amount;
+      document.getElementById('track-items-list').innerHTML = (order.order_items || [])
+        .map(i => `<li class="flex justify-between"><span>${i.quantity}x ${i.item_name}</span><span>₹${i.price_at_order * i.quantity}</span></li>`)
+        .join('');
+
+      const statusMap = {
+        placed: ['Order Placed', 'Waiting for kitchen to accept...'],
+        accepted: ['Kitchen Preparing', 'Your food is being cooked now.'],
+        out_for_delivery: ['Out for Delivery', `Runner is heading to ${order.quarter_number}.`],
+        delivered: ['Delivered', 'Enjoy your meal!'],
+        cancelled: ['Order Declined', order.rejection_reason || 'Item unavailable right now.']
+      };
+      document.getElementById('track-status-text').innerText = statusMap[order.status][0];
+      document.getElementById('track-subtext').innerText = statusMap[order.status][1];
+
+      const steps = ['placed', 'accepted', 'out_for_delivery', 'delivered'];
+      const idx = steps.indexOf(order.status);
+      steps.forEach((s, i) => {
+        const el = document.getElementById('step-' + s);
+        el.className = i <= idx && idx !== -1
+          ? 'p-1.5 rounded bg-emerald-600 text-white'
+          : 'p-1.5 rounded bg-gray-200 text-gray-500';
+      });
+    }
+
+    function clearTracker() {
+      localStorage.removeItem('hmel_active_order');
+      document.getElementById('tracker-box').classList.add('hidden');
+    }
+
+    const savedProfile = JSON.parse(localStorage.getItem('hmel_user_profile') || 'null');
+    if (savedProfile) {
+      document.getElementById('cust-name').value = savedProfile.name || '';
+      document.getElementById('cust-phone').value = savedProfile.phone || '';
+      if (savedProfile.unitRaw) {
+        document.getElementById('cust-unit-num').value = savedProfile.unitRaw;
+        resolveUnit();
+      }
+    }
+
+    db.channel('menu-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => fetchMenu())
+      .subscribe();
+
+    fetchMenu();
+    if (activeOrderId) trackOrder(activeOrderId);
+  </script>
+</body>
+</html>
